@@ -1,6 +1,14 @@
 # CNN-Builder-Information-System
 Информационная система для создания собственных сверточных сетей (бета)
 
+![image](https://github.com/fenssison112/CNN-Bilder-Information-System/assets/109478845/b6c1417d-70a7-4b17-a2b3-1e514840428d)
+![image](https://github.com/fenssison112/CNN-Bilder-Information-System/assets/109478845/fd33df3b-adee-4879-8d27-91a070aaba2e)
+![image](https://github.com/fenssison112/CNN-Bilder-Information-System/assets/109478845/b1158307-5738-4ba7-bb06-aa8b5f2d40ed)
+![image](https://github.com/fenssison112/CNN-Bilder-Information-System/assets/109478845/7e1d1d3f-5ad6-4e1a-a37f-fc619abea3c2)
+![image](https://github.com/fenssison112/CNN-Bilder-Information-System/assets/109478845/d46e3e83-f1f0-4f57-9a26-3a609fc91850)
+![image](https://github.com/fenssison112/CNN-Bilder-Information-System/assets/109478845/4fe78205-1aa5-44af-b2ec-1d8aadee0e6c)
+![image](https://github.com/fenssison112/CNN-Bilder-Information-System/assets/109478845/a49f074c-cc35-4c2c-9842-05381541b647)
+
 Левый модуль имеет «базовые настройки» и «продвинутые настройки». Базовые настройки подойдут людям которые имеют представление об нейронных сетях. 
 В разделе размер изображения, собственно, выбирается размер изображений, на которых будет обучена модель. Число каналов отвечают за цвет изображения 1- только красный, 2- только зеленый, 3 Синий. Размер и канал формирует входной слой, который отображается в центральном окне в верху. 
 
@@ -58,11 +66,12 @@ Batch Size означает, сколько образцов данных мод
 Например, если вы установите размер пакета равным 10, то модель будет обрабатывать по 10 фотографий за раз. Затем она обновит свои веса на основе результатов этой группы фотографий. Этот процесс будет повторяться для каждого пакета фотографий, пока все 1000 фотографий не будут обработаны. Это помогает ускорить обучение и эффективно использовать ресурсы вашего компьютера или сервера.
 
 Кнопка «применить» отвечает за принятие настроек созданной архитектуры. Также происходит проверка на отрицательные слои свертки. Если ошибок нет можно нажать на кнопку «начать обучение». После начала обучения в нижнем окне появляются результаты обучения каждой эпохи. Если по каким то причинам пользователь посчитает что нужно остановить обучение, он может нажать на кнопку и обучение будет остановлена на том моменте когда была нажата кнопка. 
-![image](https://github.com/fenssison112/CNN-Bilder-Information-System/assets/109478845/b6c1417d-70a7-4b17-a2b3-1e514840428d)
-![image](https://github.com/fenssison112/CNN-Bilder-Information-System/assets/109478845/fd33df3b-adee-4879-8d27-91a070aaba2e)
-![image](https://github.com/fenssison112/CNN-Bilder-Information-System/assets/109478845/b1158307-5738-4ba7-bb06-aa8b5f2d40ed)![image](https://github.com/fenssison112/CNN-Bilder-Information-System/assets/109478845/41eba3cd-9a71-4d42-bcfa-2919811e3833)
 
-![image](https://github.com/fenssison112/CNN-Bilder-Information-System/assets/109478845/fbc96a3b-6b03-44d5-a994-add61a27715f)
+
+
+
+
+
 
 
 
