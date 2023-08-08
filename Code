@@ -1,0 +1,1591 @@
+import threading
+import keras.models
+import keras
+from keras.preprocessing.image import ImageDataGenerator
+import numpy as np
+import os
+import tensorflow as tf
+from tkinter import *
+from tkinter import ttk
+import tkinter as tk
+from tkinter import filedialog
+from keras.models import load_model
+import cv2
+from keras.layers import Flatten, Dense
+from tkinter import scrolledtext
+from tkinter import Frame, Canvas, Scrollbar
+from PIL import ImageTk, Image
+from keras.layers import Dropout
+import sys
+from keras.callbacks import LambdaCallback
+
+
+root = Tk()
+root.title("CNN Builder")
+root.geometry("1500x900")
+root.resizable(width=False, height=False)
+style = ttk.Style(root)
+style.theme_use('clam')
+
+
+
+def create_folder_if_not_exists(folder_name):
+    if not os.path.exists(folder_name):
+        os.makedirs(folder_name)
+
+folder_name = "Reset_Save_IMG"
+create_folder_if_not_exists(folder_name)
+
+
+def create_folder(folder_name_save_model):
+    if not os.path.exists(folder_name_save_model):
+        os.makedirs(folder_name_save_model)
+
+folder_name_save_model = "SAVE_MODEL"
+create_folder(folder_name_save_model)
+
+
+
+# Функция для перенаправления вывода консоли в текстовое окно
+def redirect_stdout():
+    sys.stdout = text
+
+# Функция для обновления текста в одной строке
+def update_text(new_text):
+    global prev_length
+    text.delete('1.0', tk.END)  # Очищаем текстовое окно
+    text.insert(tk.END, new_text)  # Вставляем новый текст
+    text.update_idletasks()  # Обновляем текстовое окно
+    prev_length = len(new_text)  # Сохраняем длину нового текста
+
+# Функция для обновления текста в конце строки
+def append_text(new_text):
+    global prev_length
+    text.insert(tk.END, new_text)  # Добавляем новый текст в конец
+    text.update_idletasks()  # Обновляем текстовое окно
+    prev_length += len(new_text)  # Обновляем длину текста
+
+# Функция для перенаправления вывода консоли и обновления текста
+def update_console_output():
+    sys.stdout = text
+    sys.stdout.write = update_text
+    sys.stdout.flush = lambda: None
+    sys.stderr = text
+    sys.stderr.write = append_text
+    sys.stderr.flush = lambda: None
+
+# Функция для копирования текста
+def copy_text(event):
+    selected_text = text.selection_get()
+    if selected_text:
+        text.clipboard_clear()
+        text.clipboard_append(selected_text)
+
+# Функция для Загрузки обученной модели
+def open_img_size_load():
+    global file_path_model_load, size_img_load_value, size_img_load_value1, size_img_load_value2, is_your_model
+    label_img_size_load = Label(blocks_frame_load, text="Размер изображения:", bg="white")
+    label_img_size_load.place(x=15, y=133)
+    label_img_size_load1 = Entry(blocks_frame_load, width=4, textvariable=size_img_load_value)
+    label_img_size_load1.place(x=145, y=135)
+    label_img_size_load2 = Label(blocks_frame_load, text="Х", bg="white")
+    label_img_size_load2.place(x=175, y=133)
+    label_img_size_load3 = Entry(blocks_frame_load, width=4, textvariable=size_img_load_value1)
+    label_img_size_load3.place(x=189, y=135)
+    label_img_size_load4 = Label(blocks_frame_load, text="каналов", bg="white")
+    label_img_size_load4.place(x=213, y=133)
+    label_img_size_load5 = Entry(blocks_frame_load, width=1, textvariable=size_img_load_value2)
+    label_img_size_load5.place(x=263, y=135)
+
+    file_path_model_load = filedialog.askopenfilename(initialdir="/", title="Select file")
+    if file_path_model_load:
+        print("Выбран файл:", file_path_model_load)
+        is_your_model = True
+        # text.insert(tk.END, "Обученная модель выбрана\n")
+    else:
+        print("Файл не выбран!")
+
+# Функция для обновлений размера изображений
+def update_values_load(*args):
+    size_img_load_value.get()
+    size_img_load_value1.get()
+    size_img_load_value2.get()
+
+
+def loading_selection_img():
+    global img_path_load, model_load, file_path_model_load
+
+    if selected_option_load.get() == "classification_load":
+
+        if is_your_model:
+            # Загрузка модели
+            model_load = tf.keras.models.load_model(file_path_model_load)
+
+
+            # Получение количества классов
+            num_classes = model_load.output_shape[-1]
+            print("Количество классов:", num_classes)
+
+            # Загрузка изображения и его предобработка
+            img = tf.keras.preprocessing.image.load_img(img_path_load, target_size=(
+                size_img_load_value.get(), size_img_load_value1.get(), size_img_load_value2.get()))
+            x = tf.keras.preprocessing.image.img_to_array(img)
+            x = np.expand_dims(x, axis=0)
+            x = x / 255.0
+
+            # Классификация изображения с помощью модели
+            classes = model_load.predict(x)
+            print(classes)
+
+            # Вывод результата
+            class_threshold = porog_value.get()
+
+            if num_classes == 1:
+                print("Порог", porog_value.get())
+                if classes[0] < class_threshold:
+                    print("Класс 1")
+                else:
+                    print("Класс 2")
+            else:
+                class_labels = ["Класс {}".format(i + 1) for i in range(num_classes)]
+                predicted_class_index = np.argmax(classes)
+                predicted_class_label = class_labels[predicted_class_index]
+                print("Класс:", predicted_class_label)
+
+
+
+
+        elif is_your_model == False:
+            # Загрузка модели
+            base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+            model_path = os.path.join(base_path, 'my_smallface_model.h5')
+            model_load = tf.keras.models.load_model(model_path)
+            # model_load = tf.keras.models.load_model('my_smallface_model.h5')
+
+            # Загрузка изображения и его предобработка
+
+            img = tf.keras.preprocessing.image.load_img(img_path_load, target_size=(
+            300,300))
+            x = tf.keras.preprocessing.image.img_to_array(img)
+            x = np.expand_dims(x, axis=0)
+            x = x / 255.0
+
+            # Классификация изображения с помощью модели
+            classes = model_load.predict(x)
+            print(classes)
+            class_threshold = porog_value.get()
+            # Вывод результата
+            if classes[0] < class_threshold:
+                print("Лицо")
+            else:
+                print("Не лицо")
+    else:
+        # Загрузка предварительно обученного классификатора хаар-каскада для распознавания лица
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+
+        # Загрузка изображения
+        image = cv2.imread(img_path_load)
+
+        # Преобразование изображения в оттенки серого
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        # Распознавание лица на изображении
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.8, minNeighbors=1, minSize=(50, 50))
+        # scaleFactor=1.6, minNeighbors=2, minSize=(30, 30) для соль и перец
+
+        # Отображение прямоугольников вокруг распознанных лиц
+        for (x, y, w, h) in faces:
+            cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+        # Отображение изображения с прямоугольниками вокруг распознанных лиц
+        cv2.imshow('Faces', image)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+
+
+
+
+def load_img():
+    global img_path_load
+
+    img_path_load = filedialog.askopenfilename(initialdir="/", title="Select test image")
+    # print(img_path_load)
+
+    # text.insert(tk.END, img_path_load + "\n")
+    if img_path_load:
+        print("Началась обработка")
+        thread_img = threading.Thread(target=loading_selection_img)
+        thread_img.start()
+    else:
+        print("Файл не выбран")
+
+
+
+photo = None
+
+def noisy_img_reset():
+    global photo, save_noisy_image
+
+
+    ### Загрузка сохраненной модели
+    saved_model = load_model('TrainNoissy10.h5')
+    ### Загрузка и предобработка изображения с помощью TensorFlow
+    img = tf.keras.preprocessing.image.load_img(img_path_noisy_load, target_size=(300, 300))
+    img_array = tf.keras.preprocessing.image.img_to_array(img)
+    img_tensor = np.expand_dims(img_array, axis=0)
+    img_tensor /= 255.
+
+    # Предсказание класса на основе сохраненной модели
+    prediction = saved_model.predict(img_tensor)
+
+    # Вывод результата
+    if prediction[0, 0] > prediction[0, 1] and prediction[0, 0] > prediction[0, 2]:
+        print("Вероятно шум Гаусса. Выполняется восстановление фото", prediction)
+        base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+        model = os.path.join(base_path, 'trainedGausse65.h5')
+        model = tf.keras.models.load_model(model)
+
+        # Загрузка обученной модели для ЧЕРНЫХ ЛИНИЙ
+        # model = load_model("trainedGausse65.h5")
+        # Функция для удаления шума ГАУССА из изображения
+        def denoise_image(image):
+            image = image.astype('float32') / 255.0
+            image = np.expand_dims(image, axis=0)
+            denoised_image = model.predict(image)
+            denoised_image = np.squeeze(denoised_image, axis=0) * 255.0
+            denoised_image = denoised_image.astype('uint8')
+            return denoised_image
+
+        # Загрузка фотографии с шумом
+        noisy_image = np.array(Image.open(img_path_noisy_load))
+
+        # Удаление шума из фотографии
+        denoised_image = denoise_image(noisy_image)
+
+        file_name_no_ext, ext = os.path.splitext(file_name)
+        new_file_name = file_name_no_ext + "_Gausse" + ext
+
+        if save_noisy_image:
+
+            Image.fromarray(denoised_image).save(os.path.join(save_noisy_image, new_file_name))
+            print("Фотография сохранена в корневую папку:", save_noisy_image)
+
+        else:
+            Image.fromarray(denoised_image).save(os.path.join("Reset_Save_IMG", new_file_name))
+            print("Фотография сохранена в корневую папку: Reset_Save_IMG")
+
+    elif prediction[0, 1] > prediction[0, 0] and prediction[0, 1] > prediction[0, 2]:
+        print("Вероятно Линейный шум. Выполняется восстановление фото", prediction)
+
+        # # # Загрузка обученной модели для Линий
+        base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+        model = os.path.join(base_path, 'trainedLINA65.h5')
+        model = tf.keras.models.load_model(model)
+        # model = load_model("trainedLINA65.h5")
+        # Функция для удаления шума ИЗ ЛИНИЙ из изображения
+        def denoise_image(image):
+            image = image.astype('float32') / 255.0
+            image = np.expand_dims(image, axis=0)
+            denoised_image = model.predict(image)
+            denoised_image = np.squeeze(denoised_image, axis=0) * 255.0
+            denoised_image = denoised_image.astype('uint8')
+            return denoised_image
+
+        # Загрузка фотографии с шумом
+        noisy_image = np.array(Image.open(img_path_noisy_load))
+
+        # Удаление шума из фотографии
+        denoised_image = denoise_image(noisy_image)
+
+
+        file_name_no_ext, ext = os.path.splitext(file_name)
+        new_file_name = file_name_no_ext + "_Line" + ext
+
+        if save_noisy_image:
+
+            Image.fromarray(denoised_image).save(os.path.join(save_noisy_image, new_file_name))
+            print("Фотография сохранена в корневую папку:", save_noisy_image)
+
+        else:
+            Image.fromarray(denoised_image).save(os.path.join("Reset_Save_IMG", new_file_name))
+            print("Фотография сохранена в корневую папку: Reset_Save_IMG")
+
+
+    elif prediction[0, 2] > prediction[0, 0] and prediction[0, 2] > prediction[0, 1]:
+        print("Вероятно шум Соль и Перец. Выполняется восстановление фото", prediction)
+        # Загрузка обученной модели для ЧЕРНЫХ ЛИНИЙ
+        base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+        model = os.path.join(base_path, 'trainedGausse65.h5')
+        model = tf.keras.models.load_model(model)
+        # model = load_model("trainedGausse65.h5")
+
+        # Функция для удаления шума ГАУССА из изображения
+        def denoise_image(image):
+            image = image.astype('float32') / 255.0
+            image = np.expand_dims(image, axis=0)
+            denoised_image = model.predict(image)
+            denoised_image = np.squeeze(denoised_image, axis=0) * 255.0
+            denoised_image = denoised_image.astype('uint8')
+            return denoised_image
+
+        # Загрузка фотографии с шумом
+        noisy_image = np.array(Image.open(img_path_noisy_load))
+
+        # Удаление шума из фотографии
+        denoised_image = denoise_image(noisy_image)
+        file_name_no_ext, ext = os.path.splitext(file_name)
+        new_file_name = file_name_no_ext + "_SP" + ext
+
+        if save_noisy_image:
+
+            Image.fromarray(denoised_image).save(os.path.join(save_noisy_image, new_file_name))
+            print("Фотография сохранена в корневую папку:", save_noisy_image)
+
+        else:
+            Image.fromarray(denoised_image).save(os.path.join("Reset_Save_IMG", new_file_name))
+            print("Фотография сохранена в корневую папку: Reset_Save_IMG")
+
+
+def load_img_noisy():
+    global img_path_noisy_load, file_name
+    img_path_noisy_load = filedialog.askopenfilename(initialdir="/", title="Выберите тестовое изображение")
+    if img_path_noisy_load:
+        print("Началась обработка")
+        file_name = os.path.basename(img_path_noisy_load)
+
+        thread_img_noisy = threading.Thread(target=noisy_img_reset)
+        thread_img_noisy.start()
+
+    else:
+        print("Файл не выбран")
+
+
+save_path = None
+def save_model():
+    global save_path
+
+    save_path = filedialog.askdirectory(initialdir="/", title="Выберите место для сохранения модели")
+    if save_path:
+        print("Выбран путь:", save_path)
+    else:
+        save_path = None
+        print("Папка для сохранения не выбрана")
+
+
+def load_img_noisy_save():
+    global save_noisy_image
+    save_noisy_image = filedialog.askdirectory(initialdir="/",
+                                               title="Выберите место для сохранения обработанного изображения")
+    if save_noisy_image:
+        print("Выбран путь:", save_noisy_image)
+    else:
+        print("Папка для сохранения не выбрана")
+
+
+def open_dataset_directory():
+    global filepath_train, filepath_test, filepath_val, data_path, is_save
+    dataset_path = filedialog.askdirectory(initialdir="/", title="Выберите папку датасета")
+
+    filepath_train = os.path.join(dataset_path, "train")
+    filepath_val = os.path.join(dataset_path, "val")
+
+    # Проверка наличия папок
+    if os.path.exists(filepath_train) and  os.path.exists(filepath_val):
+        print("Пути к папкам Train и Validation успешно сохранены.")
+        is_save = True
+    else:
+        print("Ошибка: Один или несколько путей к папкам Train и Validation не существуют.")
+        is_save = False
+
+
+
+def class_mode_select(event):
+    global selected_calss_mode, classlosse, class_mode
+    selected_calss_mode = combo3.get()
+
+    if selected_calss_mode == 'binary':
+        classlosse = 'binary_crossentropy'
+        class_mode = 'binary'
+    else:
+        classlosse = 'categorical_crossentropy'
+        class_mode = 'categorical'
+
+
+
+
+def on_optimize_selected(event):
+    global optimizer_value, optimizer
+    combo_optemizator = combo1_2.get()
+    if combo_optemizator == "Адаптивная оценка":
+        optimizer = 'adam'
+    elif combo_optemizator == "Оптимизационный алгоритм":
+        optimizer = 'RMSprop'
+    elif combo_optemizator == "Стохастический градиентный спуск":
+        optimizer = 'SGD'
+
+
+def update_values(*args):
+    global sizeimg1_value, sizeimg2_value, canal_value, batch_size_value, epoch_value, optimizer_value
+
+    architecture = combo1.get()
+    if architecture == "Создать свою архитектуру":
+        sizeimg1_value.set(300)
+        sizeimg2_value.set(300)
+        canal_value.set(3)
+
+        covd_value.set(5)
+        stepMax_value.set(1)
+        dropout.set(0.5)
+        hidden_layer.set(5)
+        loss_value.set(0.01)
+        fully_conect.set(2)
+        batch_size_value.set(32)
+
+        epoch_value.set(10)
+        entryy1.config(state="normal")
+        entryy2.config(state="normal")
+    elif architecture == "VGG-16":
+        sizeimg1_value.set(227)
+        sizeimg2_value.set(227)
+        canal_value.set(3)
+        covd_value.set(13)
+        stepMax_value.set(4)
+        dropout.set(0.5)
+        hidden_layer.set(13)
+        fully_conect.set(3)
+        batch_size_value.set(64)
+
+        epoch_value.set(10)
+        entryy1.config(state="disabled")
+        entryy2.config(state="disabled")
+    elif architecture == "ResNet-18":
+        sizeimg1_value.set(224)
+        sizeimg2_value.set(224)
+        canal_value.set(3)
+        covd_value.set(15)
+        stepMax_value.set(4)
+        dropout.set(0.5)
+        hidden_layer.set(15)
+        fully_conect.set(3)
+        batch_size_value.set(64)
+
+        epoch_value.set(10)
+        entryy1.config(state="disabled")
+        entryy2.config(state="disabled")
+
+    elif architecture == "AlexNet":
+        sizeimg1_value.set(224)
+        sizeimg2_value.set(224)
+        canal_value.set(3)
+        covd_value.set(5)
+        stepMax_value.set(1)
+        dropout.set(0.5)
+        hidden_layer.set(5)
+        fully_conect.set(3)
+        batch_size_value.set(32)
+
+        epoch_value.set(10)
+        entryy1.config(state="disabled")
+        entryy2.config(state="disabled")
+
+    elif architecture == "LeNet-5":
+        sizeimg1_value.set(32)
+        sizeimg2_value.set(32)
+        canal_value.set(3)
+        covd_value.set(2)
+        stepMax_value.set(1)
+        dropout.set(0.5)
+        hidden_layer.set(2)
+        fully_conect.set(3)
+        batch_size_value.set(16)
+
+        epoch_value.set(10)
+        entryy1.config(state="disabled")
+        entryy2.config(state="disabled")
+
+
+def train_model():
+    global model, training_in_progress, class_losse, num_layers_esy, save_path, valid_model, is_apply, train_dataset, validation_dataset, input_shape
+    is_apply = True
+
+    filter_size = 3
+    input_shape = (sizeimg1_value.get(), sizeimg2_value.get(), canal_value.get())
+    train = ImageDataGenerator(rescale=1 / 255)
+    validation = ImageDataGenerator(rescale=1 / 255)
+
+    train_dataset = train.flow_from_directory(filepath_train,
+                                              target_size=(sizeimg1_value.get(), sizeimg2_value.get()),
+
+                                              class_mode=class_mode)
+    validation_dataset = validation.flow_from_directory(filepath_val,
+                                                        target_size=(
+                                                            sizeimg1_value.get(), sizeimg2_value.get()),
+
+                                                        class_mode=class_mode)
+    if mode.get() == "basic":
+        architecture_select = combo1.get()
+        batch_size_value.set(32)
+
+        if architecture_select == "Создать свою архитектуру":
+
+
+            num_filters = 16
+
+
+
+            model = keras.models.Sequential()
+
+            for i in range(num_layers_esy):
+                activation_conv = activation_combobox_conv_list[i].get()
+
+                # Проверка размеров входного изображения перед первым слоем свертки
+                if i == 0:
+                    if input_shape[0] < filter_size or input_shape[1] < filter_size:
+                        valid_model = False
+                        print("Ошибка: Некорректный размер входного изображения для Conv2D")
+                        break
+                    model.add(keras.layers.Conv2D(num_filters, (filter_size, filter_size), activation=activation_conv,
+                                                  padding='same', input_shape=input_shape))
+                else:
+                    model.add(keras.layers.Conv2D(num_filters, (filter_size, filter_size), activation=activation_conv,
+                                                  padding='same'))
+
+                print(f"Сверточный слой {i + 1}: Фильтры={num_filters}, Активация={activation_conv}")
+
+                try:
+                    model.add(keras.layers.MaxPooling2D((2, 2)))
+                    print("Слой пулинга (MaxPooling): Размер пула=2x2")
+
+
+                    # Проверка размеров перед слоем MaxPooling2D
+                    if input_shape[0] < 2 or input_shape[1] < 2:
+                        valid_model = False
+                        print("Ошибка: Некорректный размер для слоя MaxPooling2D")
+                        break
+
+                    input_shape = (input_shape[0] // 2, input_shape[1] // 2, input_shape[2])
+                except ValueError as error:
+                    valid_model = False
+                    print(f"Ошибка: {error}")
+                    break
+
+                if i % 2 == 1:
+                    num_filters *= 2
+                    if num_filters > 512:
+                        num_filters = 512
+
+            if valid_model:
+                model.add(keras.layers.Flatten())
+
+                # Добавление полносвязных слоев
+                for i in range(len(num_neurons_entries) - 1):
+                    num_neurons = int(num_neurons_entries[i].get())
+                    activation_fc = activation_combobox_fc_list[i].get()
+                    print(f"Полносвязный слой {i + 1}: Единицы={num_neurons}, Активация={activation_fc}")
+                    model.add(keras.layers.Dense(num_neurons, activation=activation_fc))
+
+                # Добавление последнего полносвязного слоя
+                num_neurons_last = int(num_neurons_entries[-1].get())
+                activation_fc_last = activation_combobox_fc_list[-1].get()
+                print(f"Последний полносвязный слой: Единицы={num_neurons_last}, Активация={activation_fc_last}")
+                model.add(keras.layers.Dense(num_neurons_last, activation=activation_fc_last))
+
+                model.summary()
+
+
+        elif architecture_select == "VGG-16":
+
+            filters = [64, 128, 256, 512, 512]
+            model = keras.models.Sequential()
+
+            # Block 1
+            model.add(keras.layers.Conv2D(64, (3, 3), activation=activation_combobox_conv_list[0].get(), padding='same', input_shape=input_shape))
+            print(f"Сверточный слой 1: Фильтры= 3 на 3, Функция активации={activation_combobox_conv_list[0].get()}")
+
+            model.add(keras.layers.Conv2D(64, (3, 3),activation=activation_combobox_conv_list[1].get(), padding='same'))
+            model.add(keras.layers.MaxPooling2D((2, 2), strides=(2, 2)))
+
+            # Block 2
+            model.add(keras.layers.Conv2D(128, (3, 3), activation=activation_combobox_conv_list[2].get(), padding='same'))
+            print(f"Сверточный слой3: Фильтры= 3 на 3, Функция активации={activation_combobox_conv_list[2].get()}")
+            model.add(keras.layers.Conv2D(128, (3, 3), activation=activation_combobox_conv_list[3].get(), padding='same'))
+            model.add(keras.layers.MaxPooling2D((2, 2), strides=(2, 2)))
+
+            # Block 3
+            model.add(keras.layers.Conv2D(256, (3, 3), activation=activation_combobox_conv_list[4].get(), padding='same'))
+            model.add(keras.layers.Conv2D(256, (3, 3), activation=activation_combobox_conv_list[5].get(), padding='same'))
+            model.add(keras.layers.Conv2D(256, (3, 3), activation=activation_combobox_conv_list[6].get(), padding='same'))
+            model.add(keras.layers.MaxPooling2D((2, 2), strides=(2, 2)))
+
+            # Block 4
+            model.add(keras.layers.Conv2D(512, (3, 3), activation=activation_combobox_conv_list[7].get(), padding='same'))
+            model.add(keras.layers.Conv2D(512, (3, 3), activation=activation_combobox_conv_list[8].get(), padding='same'))
+            model.add(keras.layers.Conv2D(512, (3, 3), activation=activation_combobox_conv_list[9].get(), padding='same'))
+            model.add(keras.layers.MaxPooling2D((2, 2), strides=(2, 2)))
+
+            # Block 5
+            model.add(keras.layers.Conv2D(512, (3, 3), activation=activation_combobox_conv_list[10].get(), padding='same'))
+            model.add(keras.layers.Conv2D(512, (3, 3), activation=activation_combobox_conv_list[11].get(), padding='same'))
+            model.add(keras.layers.Conv2D(512, (3, 3), activation=activation_combobox_conv_list[12].get(), padding='same'))
+            print(
+                f"Сверточный слой 13: Фильтры= 3 на 3, Функция активации={activation_combobox_conv_list[12].get()}")
+            model.add(keras.layers.MaxPooling2D((2, 2), strides=(2, 2)))
+
+            model.add(keras.layers.Flatten())
+
+            # Добавление полносвязных слоев
+            for i in range(len(num_neurons_entries) - 1):
+                num_neurons = int(num_neurons_entries[i].get())
+                activation_fc = activation_combobox_fc_list[i].get()
+                print(f"Полносвязный слой {i + 1}: Единицы={num_neurons}, Активация={activation_fc}")
+                model.add(keras.layers.Dense(num_neurons, activation=activation_fc))
+
+            # Добавление последнего полносвязного слоя
+            num_neurons_last = int(num_neurons_entries[-1].get())
+            activation_fc_last = activation_combobox_fc_list[-1].get()
+            print(f"Последний полносвязный слой: Единицы={num_neurons_last}, Активация={activation_fc_last}")
+            model.add(keras.layers.Dense(num_neurons_last, activation=activation_fc_last))
+
+            model.summary()
+
+        elif architecture_select == "ResNet-18":
+
+
+            # Создание модели
+            model = keras.models.Sequential()
+
+            # Сверточные слои
+            model.add(
+                keras.layers.Conv2D(64, (3, 3), padding='same', activation=activation_combobox_conv_list[0].get(),
+                                    input_shape=input_shape))
+            print("Сверточный слой 1: Фильтры=64, Размер ядра=(3, 3), Активация=",
+                  activation_combobox_conv_list[0].get())
+
+            model.add(
+                keras.layers.Conv2D(64, (3, 3), padding='same', activation=activation_combobox_conv_list[1].get()))
+            print("Сверточный слой 2: Фильтры=64, Размер ядра=(3, 3), Активация=",
+                  activation_combobox_conv_list[1].get())
+
+            model.add(
+                keras.layers.Conv2D(64, (3, 3), padding='same', activation=activation_combobox_conv_list[2].get()))
+            print("Сверточный слой 3: Фильтры=64, Размер ядра=(3, 3), Активация=",
+                  activation_combobox_conv_list[2].get())
+
+            model.add(keras.layers.MaxPooling2D((2, 2), strides=(2, 2), padding='same'))
+            print("Слой максимального пулинга 1: Размер пула=(2, 2), Шаг=(2, 2)")
+
+            model.add(
+                keras.layers.Conv2D(128, (3, 3), padding='same', activation=activation_combobox_conv_list[3].get()))
+            print("Сверточный слой 4: Фильтры=128, Размер ядра=(3, 3), Активация=",
+                  activation_combobox_conv_list[3].get())
+
+            model.add(
+                keras.layers.Conv2D(128, (3, 3), padding='same', activation=activation_combobox_conv_list[4].get()))
+            print("Сверточный слой 5: Фильтры=128, Размер ядра=(3, 3), Активация=",
+                  activation_combobox_conv_list[4].get())
+
+            model.add(
+                keras.layers.Conv2D(128, (3, 3), padding='same', activation=activation_combobox_conv_list[5].get()))
+            print("Сверточный слой 6: Фильтры=128, Размер ядра=(3, 3), Активация=",
+                  activation_combobox_conv_list[5].get())
+
+            model.add(keras.layers.MaxPooling2D((2, 2), strides=(2, 2), padding='same'))
+            print("Слой максимального пулинга 2: Размер пула=(2, 2), Шаг=(2, 2)")
+
+            model.add(
+                keras.layers.Conv2D(256, (3, 3), padding='same', activation=activation_combobox_conv_list[6].get()))
+            print("Сверточный слой 7: Фильтры=256, Размер ядра=(3, 3), Активация=",
+                  activation_combobox_conv_list[6].get())
+
+            model.add(
+                keras.layers.Conv2D(256, (3, 3), padding='same', activation=activation_combobox_conv_list[7].get()))
+            print("Сверточный слой 8: Фильтры=256, Размер ядра=(3, 3), Активация=",
+                  activation_combobox_conv_list[7].get())
+
+            model.add(
+                keras.layers.Conv2D(256, (3, 3), padding='same', activation=activation_combobox_conv_list[8].get()))
+            print("Сверточный слой 9: Фильтры=256, Размер ядра=(3, 3), Активация=",
+                  activation_combobox_conv_list[8].get())
+
+            model.add(keras.layers.MaxPooling2D((2, 2), strides=(2, 2), padding='same'))
+            print("Слой максимального пулинга 3: Размер пула=(2, 2), Шаг=(2, 2)")
+
+            model.add(
+                keras.layers.Conv2D(512, (3, 3), padding='same', activation=activation_combobox_conv_list[9].get()))
+            print("Сверточный слой 10: Фильтры=512, Размер ядра=(3, 3), Активация=",
+                  activation_combobox_conv_list[9].get())
+
+            model.add(keras.layers.Conv2D(512, (3, 3), padding='same',
+                                          activation=activation_combobox_conv_list[10].get()))
+            print("Сверточный слой 11: Фильтры=512, Размер ядра=(3, 3), Активация=",
+                  activation_combobox_conv_list[10].get())
+
+            model.add(keras.layers.Conv2D(512, (3, 3), padding='same',
+                                          activation=activation_combobox_conv_list[11].get()))
+            print("Сверточный слой 12: Фильтры=512, Размер ядра=(3, 3), Активация=",
+                  activation_combobox_conv_list[11].get())
+
+            model.add(keras.layers.MaxPooling2D((2, 2), strides=(2, 2), padding='same'))
+            print("Слой максимального пулинга 4: Размер пула=(2, 2), Шаг=(2, 2)")
+
+            model.add(keras.layers.Conv2D(512, (3, 3), padding='same',
+                                          activation=activation_combobox_conv_list[12].get()))
+            print("Сверточный слой 13: Фильтры=512, Размер ядра=(3, 3), Активация=",
+                  activation_combobox_conv_list[12].get())
+
+            model.add(keras.layers.Conv2D(512, (3, 3), padding='same',
+                                          activation=activation_combobox_conv_list[13].get()))
+            print("Сверточный слой 14: Фильтры=512, Размер ядра=(3, 3), Активация=",
+                  activation_combobox_conv_list[13].get())
+
+            model.add(keras.layers.Conv2D(512, (3, 3), padding='same',
+                                          activation=activation_combobox_conv_list[14].get()))
+            print("Сверточный слой 15: Фильтры=512, Размер ядра=(3, 3), Активация=",
+                  activation_combobox_conv_list[14].get())
+
+            model.add(keras.layers.Flatten())
+
+            # Добавление полносвязных слоев
+            for i in range(len(num_neurons_entries) - 1):
+                num_neurons = int(num_neurons_entries[i].get())
+                activation_fc = activation_combobox_fc_list[i].get()
+                print(f"Полносвязный слой {i + 1}: Единицы={num_neurons}, Активация={activation_fc}")
+                model.add(keras.layers.Dense(num_neurons, activation=activation_fc))
+
+            # Добавление последнего полносвязного слоя
+            num_neurons_last = int(num_neurons_entries[-1].get())
+            activation_fc_last = activation_combobox_fc_list[-1].get()
+            print(f"Последний полносвязный слой: Единицы={num_neurons_last}, Активация={activation_fc_last}")
+            model.add(keras.layers.Dense(num_neurons_last, activation=activation_fc_last))
+
+            model.summary()
+
+        elif architecture_select == "AlexNet":
+            model = keras.models.Sequential()
+            # Сверточные слои
+            model.add(keras.layers.Conv2D(96, (11, 11), strides=(4, 4), padding='valid',
+                                          activation=activation_combobox_conv_list[0].get(),
+                                          input_shape=input_shape))
+            print("Сверточный слой 1: Фильтры=96, Размер ядра=(11, 11), Шаг=(4, 4), Активация=",
+                  activation_combobox_conv_list[0].get())
+
+            model.add(keras.layers.MaxPooling2D(pool_size=(3, 3), strides=(2, 2), padding='valid'))
+            print("Слой максимального пулинга 1: Размер пула=(3, 3), Шаг=(2, 2)")
+
+            model.add(keras.layers.Conv2D(256, (5, 5), strides=(1, 1), padding='same',
+                                          activation=activation_combobox_conv_list[1].get()))
+            print("Сверточный слой 2: Фильтры=256, Размер ядра=(5, 5), Шаг=(1, 1), Активация=",
+                  activation_combobox_conv_list[1].get())
+
+            model.add(keras.layers.MaxPooling2D(pool_size=(3, 3), strides=(2, 2), padding='valid'))
+            print("Слой максимального пулинга 2: Размер пула=(3, 3), Шаг=(2, 2)")
+
+            model.add(keras.layers.Conv2D(384, (3, 3), strides=(1, 1), padding='same',
+                                          activation=activation_combobox_conv_list[2].get()))
+            print("Сверточный слой 3: Фильтры=384, Размер ядра=(3, 3), Шаг=(1, 1), Активация=",
+                  activation_combobox_conv_list[2].get())
+
+            model.add(keras.layers.Conv2D(384, (3, 3), strides=(1, 1), padding='same',
+                                          activation=activation_combobox_conv_list[3].get()))
+            print("Сверточный слой 4: Фильтры=384, Размер ядра=(3, 3), Шаг=(1, 1), Активация=",
+                  activation_combobox_conv_list[3].get())
+
+            model.add(keras.layers.Conv2D(256, (3, 3), strides=(1, 1), padding='same',
+                                          activation=activation_combobox_conv_list[4].get()))
+            print("Сверточный слой 5: Фильтры=256, Размер ядра=(3, 3), Шаг=(1, 1), Активация=",
+                  activation_combobox_conv_list[4].get())
+
+            model.add(keras.layers.MaxPooling2D(pool_size=(3, 3), strides=(2, 2), padding='valid'))
+            print("Слой максимального пулинга 3: Размер пула=(3, 3), Шаг=(2, 2)")
+
+            model.add(keras.layers.Flatten())
+
+            # Добавление полносвязных слоев
+            for i in range(len(num_neurons_entries) - 1):
+                num_neurons = int(num_neurons_entries[i].get())
+                activation_fc = activation_combobox_fc_list[i].get()
+                print(f"Полносвязный слой {i + 1}: Единицы={num_neurons}, Активация={activation_fc}")
+                model.add(keras.layers.Dense(num_neurons, activation=activation_fc))
+
+            # Добавление последнего полносвязного слоя
+            num_neurons_last = int(num_neurons_entries[-1].get())
+            activation_fc_last = activation_combobox_fc_list[-1].get()
+            print(f"Последний полносвязный слой: Единицы={num_neurons_last}, Активация={activation_fc_last}")
+            model.add(keras.layers.Dense(num_neurons_last, activation=activation_fc_last))
+
+            model.summary()
+
+        elif architecture_select == "LeNet-5":
+            model = keras.models.Sequential()
+            # Conv1: Convolutional Layer
+            model.add(keras.layers.Conv2D(6, kernel_size=(5, 5), activation=activation_combobox_conv_list[0].get(),input_shape=input_shape))
+            print(f"Слой свертки 1: Фильтров 6. матрица 5 х 5, Активация={activation_combobox_conv_list[0].get()}")
+
+            # AvgPool1: Average Pooling Layer
+            model.add(keras.layers.AveragePooling2D(pool_size=(2, 2), strides=(2, 2)))
+
+            # Conv2: Convolutional Layer
+            model.add(keras.layers.Conv2D(16, kernel_size=(5, 5), activation=activation_combobox_conv_list[1].get()))
+            print(
+                f"Слой свертки 2: Фильтров 16. матрица 5 х 5, Активация={activation_combobox_conv_list[1].get()}")
+
+            # AvgPool2: Average Pooling Layer
+            model.add(keras.layers.AveragePooling2D(pool_size=(2, 2), strides=(2, 2)))
+
+            model.add(keras.layers.Flatten())
+
+            # Добавление полносвязных слоев
+            for i in range(len(num_neurons_entries) - 1):
+                num_neurons = int(num_neurons_entries[i].get())
+                activation_fc = activation_combobox_fc_list[i].get()
+                print(f"Полносвязный слой {i + 1}: Единицы={num_neurons}, Активация={activation_fc}")
+                model.add(keras.layers.Dense(num_neurons, activation=activation_fc))
+
+            # Добавление последнего полносвязного слоя
+            num_neurons_last = int(num_neurons_entries[-1].get())
+            activation_fc_last = activation_combobox_fc_list[-1].get()
+            print(f"Последний полносвязный слой: Единицы={num_neurons_last}, Активация={activation_fc_last}")
+            model.add(keras.layers.Dense(num_neurons_last, activation=activation_fc_last))
+
+            model.summary()
+
+
+
+    elif mode.get() == "advanced":
+
+        model = keras.models.Sequential()
+        for i in range(len(num_kernels_entries)):
+            # Добавление сверточных слоев и слоев макспулинга
+            num_kernels = int(num_kernels_entries[i].get())
+            kernel_size1 = int(kernel_size_entries1[i].get())
+            kernel_size2 = int(kernel_size_entries2[i].get())
+            activation_conv = activation_combobox_conv_list[i].get()
+            if i == 0:
+                model.add(keras.layers.Conv2D(num_kernels, (kernel_size1, kernel_size2),
+                                              activation=activation_conv,
+                                              padding='same',
+                                              input_shape=(
+                                              input_shape)))
+
+            else:
+                model.add(keras.layers.Conv2D(num_kernels, (kernel_size1, kernel_size2),
+                                              activation=activation_conv,
+                                              padding='same'))
+
+            if i < len(entry_filter_matrix1_list):
+                filter_matrix1 = int(entry_filter_matrix1_list[i].get())
+                filter_matrix2 = int(entry_filter_matrix2_list[i].get())
+                model.add(keras.layers.MaxPool2D((filter_matrix1, filter_matrix2)))
+
+        model.add(keras.layers.Flatten())
+        if checkbox_state.get():
+            model.add(Dropout(dropout.get()))
+
+        for i in range(len(num_neurons_entries) - 1):  # Добавление полносвязных слоев, кроме последнего
+            num_neurons = int(num_neurons_entries[i].get())
+            activation_fc = activation_combobox_fc_list[i].get()
+            model.add(keras.layers.Dense(num_neurons, activation=activation_fc))
+
+        num_neurons_last = int(num_neurons_entries[-1].get())  # Последний полносвязный слой
+        activation_fc_last = activation_combobox_fc_list[-1].get()
+        model.add(keras.layers.Dense(num_neurons_last, activation=activation_fc_last))
+
+        model.summary()
+
+
+def start_train():
+    global is_apply, model, training_in_progress
+    print("Обученчение началось")
+    is_apply = False
+    batch_losses = []
+    # Определяем функцию, которая будет вызываться после каждого батча
+    def batch_loss_callback(batch, logs):
+        global model, training_in_progress
+        # Получаем значение loss для текущего батча
+        loss = logs['loss']
+        # Добавляем значение loss в список
+        batch_losses.append(loss)
+        if loss < loss_value.get():
+            model.stop_training = True  # Установка флага остановки обучения
+            training_in_progress = False
+
+    # Создаем обратный вызов LambdaCallback
+    loss_callback = LambdaCallback(on_batch_end=batch_loss_callback)
+    # Компиляция модели
+    model.compile(loss=classlosse, optimizer=optimizer, metrics=['accuracy'])
+    # Обучение модели с использованием обратного вызова LambdaCallback
+    model_fit = model.fit(train_dataset, batch_size=batch_size_value.get(), epochs=epoch_value.get(), validation_data=validation_dataset,
+                          callbacks=[loss_callback], verbose=2)
+
+    if save_path is not None:
+        model.save(os.path.join(save_path, "Model.h5"))
+        print("Обучение остановлено")
+        print("Модель сохранена в указанное место:", save_path)
+        training_in_progress = False
+        model = None
+    else:
+        save_path_default = os.path.join("SAVE_MODEL", "Model.h5")
+        model.save(save_path_default)
+        print("Обучение остановлено")
+        print("Модель сохранена в корневую папку SAVE MODEL:", save_path_default)
+        training_in_progress = False
+        model = None
+
+def check_start_train():
+    global training_in_progress
+    if training_in_progress == False and is_save and all_entries_filled and valid_model and is_apply:
+        thread = threading.Thread(target=start_train)
+        thread.start()
+        training_in_progress = True
+    elif training_in_progress:
+        print("Обучение уже запущенно")
+    else:
+        print("Примените настройки")
+
+
+def two_in_one():
+    global training_in_progress, is_save, all_entries_filled
+
+    if not all_entries_filled():
+        print("Не все поля заполнены или содержат 0")
+        return
+
+    if training_in_progress == False and is_save and all_entries_filled:
+        # Запуск обучения модели
+        train_model()
+
+    elif is_save == False:
+        print("Не указан путь к датасету")
+    elif training_in_progress:
+        print("Обучение уже запущено, дождитесь окончания")
+    else:
+        print("Внутренняя ошибка, перезапустите программу")
+
+
+def stop_training():
+    global model, training_in_progress
+    if training_in_progress:
+        print('Останавливаем обучение. Ждите')
+        model.stop_training = True  # Установка флага остановки обучения
+        training_in_progress = False
+
+def create_convolution_layers():
+    global num_kernels_entries, kernel_size_entries1, kernel_size_entries2, entry_filter_matrix1_list, entry_filter_matrix2_list, num_neurons_entries, activation_combobox_fc_list, activation_combobox_conv_list, num_layers_esy
+
+
+    for widget in canvas_frame.winfo_children():
+        widget.destroy()
+
+    num_layers = covd_value.get()
+    step_max = stepMax_value.get()
+    num_fc_layers = fully_conect.get()
+    num_layers_esy = hidden_layer.get()
+    input_layers = sizeimg1_value.get() * sizeimg2_value.get() * canal_value.get() if canal_value.get() != 0 else sizeimg1_value.get() * sizeimg2_value.get()
+
+    num_kernels_entries = []
+    kernel_size_entries1 = []
+    kernel_size_entries2 = []
+    entry_filter_matrix1_list = []
+    entry_filter_matrix2_list = []
+    num_neurons_entries = []
+    activation_combobox_fc_list = []
+    activation_combobox_conv_list = []
+    num_kernels_default = []
+
+    architecture_select = combo1.get()
+    if architecture_select == "Создать свою архитектуру":
+        for i in range(num_layers):
+            num = min(16 * 2 ** (i // 2), 512)
+            num_kernels_default.append(num)
+    elif architecture_select == "VGG-16":
+        for i in range(num_layers):
+            num = min(32 * 2 ** (i // 2), 512)
+            num_kernels_default.append(num)
+    elif architecture_select == "ResNet-18":
+        for i in range(num_layers):
+            num = min(64 * 2 ** i, 512)
+            num_kernels_default.append(num)
+    elif architecture_select == "AlexNet":
+        for i in range(num_layers):
+            if i == 0:
+                num = 96
+            elif i == 1:
+                num = 256
+            elif i == 2:
+                num = 384
+            elif i == 3:
+                num = 384
+            elif i == 4:
+                num = 256
+            else:
+                num = 512  # Если num_layers > 5, то последующие значения будут равны 512
+            num_kernels_default.append(num)
+
+    elif architecture_select == "LeNet-5":
+        for i in range(num_layers):
+            if i == 0:
+                num = 6
+            elif i == 1:
+                num = 6
+            else:
+                num = 6  # Если num_layers > 5, то последующие значения будут равны 512
+            num_kernels_default.append(num)
+
+
+    pool_size_default = [(2, 2)] * num_layers  # Значения размера ядра по умолчанию
+    kernel_size_default = [(3, 3)] * num_layers  # Значения размера ядра по умолчанию
+
+    if mode.get() == "basic":
+        activation_conv_default = ["ReLU"] * num_layers_esy  # Значения активации по умолчанию
+
+        input_label_cnn = Label(canvas_frame, text="Конечная архитектура СНС:", bg="white")
+        input_label_cnn.grid(row=0, column=0, pady=5, sticky="N")
+
+        input_layers_label = Label(canvas_frame, text=f"Входной слой: {input_layers} нейронов", bg="white")
+        input_layers_label.grid(row=1, column=0, pady=5, sticky="N")
+
+        for i in range(num_layers_esy):
+            hidden_layer_label = Frame(canvas_frame, width=300, height=30)
+            hidden_layer_label.grid(row=i + 2, column=0, padx=5, pady=5, sticky="NS")
+
+            label_conv = Label(hidden_layer_label , text=f"Скрытый слой: {i + 1}:", bg="white")
+            label_conv.grid(row=0, column=0, sticky="N")
+
+            activation_label = Label(hidden_layer_label, text="Функция активации:", bg="white")
+            activation_label.grid(row=0, column=1)
+
+            activation_combobox = ttk.Combobox(hidden_layer_label, values=["relu", "sigmoid", "softmax"], width=7,
+                                               state="readonly")
+            activation_combobox.grid(row=0, column=2)
+            activation_combobox.current(activation_conv_default.index(activation_conv_default[i]))  # Установка значения по умолчанию
+            activation_combobox_conv_list.append(activation_combobox)
+
+        if architecture_select == "Создать свою архитектуру":
+            default_fc_neurons = 512
+            last_layer_neurons = 1
+        elif architecture_select == "VGG-16":
+            default_fc_neurons = 4096
+            last_layer_neurons = 1000
+        elif architecture_select == "ResNet-18":
+            default_fc_neurons = 1000
+            last_layer_neurons = 1000
+        elif architecture_select == "AlexNet":
+            default_fc_neurons = 4096
+            last_layer_neurons = 1000
+        elif architecture_select == "LeNet-5":
+            default_fc_neurons = 120
+            last_layer_neurons = 10
+        else:
+            default_fc_neurons = 512
+
+        for i in range(num_fc_layers):
+            layer_frame_fc = Frame(canvas_frame, width=300, height=30)
+            layer_frame_fc.grid(row=(num_layers_esy + i + 5), column=0, padx=5, pady=5)
+
+            label_fc_text = f"Полносвязный слой {i + 1}: Количество нейронов на выходе" if i == num_fc_layers - 1 else f"Полносвязный слой {i + 1}: Количество нейронов:"
+            label_fc = Label(layer_frame_fc, text=label_fc_text, bg="white")
+            label_fc.grid(row=0, column=0, sticky="w")
+
+            num_neurons_entry = Entry(layer_frame_fc, width=4)
+            if i == num_fc_layers - 1:
+                num_neurons_entry.insert(0, last_layer_neurons)
+                activation_value = "sigmoid"
+            else:
+                num_neurons_entry.insert(0, default_fc_neurons)  # Значение по умолчанию
+                activation_value = "relu"
+            num_neurons_entry.grid(row=0, column=1)
+
+            activation_label_fc = Label(layer_frame_fc, text="Функция активации:", bg="white")
+            activation_label_fc.grid(row=0, column=2)
+
+            activation_combobox_fc = ttk.Combobox(layer_frame_fc, values=["relu", "sigmoid", "softmax"], width=7,
+                                                  state="readonly")
+            activation_combobox_fc.grid(row=0, column=3)
+            activation_combobox_fc.current(activation_combobox_fc['values'].index(activation_value))
+            num_neurons_entries.append(num_neurons_entry)
+            activation_combobox_fc_list.append(activation_combobox_fc)
+
+
+    elif mode.get() == "advanced":
+        activation_conv_default = ["ReLU"] * num_layers  # Значения активации по умолчанию
+        label_step4_cnn = Label(canvas_frame, text="Конечная архитектура СНС:", justify='center', bg="white")
+        label_step4_cnn.grid(row=0, column=0, pady=5)
+
+        for i in range(num_layers):
+            layer_frame_conv = Frame(canvas_frame, width=300, height=30)
+            layer_frame_conv.grid(row=i * (step_max + 1) + 1, column=0, padx=5, pady=5)
+
+            label_conv = Label(layer_frame_conv, text=f"Слой свертки {i + 1}: Число ядер:", bg="white")
+            label_conv.grid(row=0, column=0, sticky="w")
+
+            num_kernels_entry = Entry(layer_frame_conv, width=4)
+            num_kernels_entry.grid(row=0, column=1)
+            num_kernels_entry.insert(0, str(num_kernels_default[i]))  # Установка значения по умолчанию
+
+            kernel_size_label = Label(layer_frame_conv, text="размер матрицы ядра", bg="white")
+            kernel_size_label.grid(row=0, column=2)
+
+            kernel_size_entry1 = Entry(layer_frame_conv, width=4)
+            kernel_size_entry1.grid(row=0, column=3)
+            kernel_size_entry1.insert(0, str(kernel_size_default[i][0]))  # Установка значения по умолчанию
+
+            x_label = Label(layer_frame_conv, text="на", bg="white")
+            x_label.grid(row=0, column=4)
+
+            kernel_size_entry2 = Entry(layer_frame_conv, width=4)
+            kernel_size_entry2.grid(row=0, column=5)
+            kernel_size_entry2.insert(0, str(kernel_size_default[i][1]))  # Установка значения по умолчанию
+
+            activation_label = Label(layer_frame_conv, text="Функция активации:", bg="white")
+            activation_label.grid(row=0, column=6)
+
+            activation_combobox = ttk.Combobox(layer_frame_conv, values=["relu", "sigmoid", "softmax"], width=7,
+                                               state="readonly")
+            activation_combobox.grid(row=0, column=7)
+            activation_combobox.current(
+            activation_conv_default.index(activation_conv_default[i]))  # Установка значения по умолчанию
+
+            # Сохранение ссылок на поля ввода
+            num_kernels_entries.append(num_kernels_entry)
+            kernel_size_entries1.append(kernel_size_entry1)
+            kernel_size_entries2.append(kernel_size_entry2)
+            activation_combobox_conv_list.append(activation_combobox)
+
+            if i % step_max == step_max - 1 and i < num_layers - 1:
+                layer_frame_pool = Frame(canvas_frame, width=300, height=30)
+                layer_frame_pool.grid(row=i * (step_max + 1) + 2, column=0, padx=5, pady=5)
+
+                label_pool = Label(layer_frame_pool, text=f"Слой макспулинга {i // step_max + 1}:", bg="white")
+                label_pool.grid(row=0, column=0, sticky="w")
+
+                label_filter_matrix = Label(layer_frame_pool, text="Матрица фильтра:", bg="white")
+                label_filter_matrix.grid(row=0, column=1)
+
+                entry_filter_matrix1 = Entry(layer_frame_pool, width=4)
+                entry_filter_matrix1.grid(row=0, column=2)
+                entry_filter_matrix1.insert(0, str(pool_size_default[i][0]))  # Установка значения по умолчанию
+
+                x_label = Label(layer_frame_pool, text="X", anchor="w", bg="white")
+                x_label.grid(row=0, column=3)
+
+                entry_filter_matrix2 = Entry(layer_frame_pool, width=4)
+                entry_filter_matrix2.grid(row=0, column=4, sticky="w")
+                entry_filter_matrix2.insert(0, str(pool_size_default[i][1]))  # Установка значения по умолчанию
+
+                # Сохранение ссылок на поля ввода
+                entry_filter_matrix1_list.append(entry_filter_matrix1)
+                entry_filter_matrix2_list.append(entry_filter_matrix2)
+
+        # Добавление слоя макспулинга в конце, если num_layers > 0
+        if num_layers > 0:
+            last_pool_layer = (num_layers - 1) // step_max + 1
+            if last_pool_layer > (num_layers - 1) / step_max:
+                layer_frame_pool = Frame(canvas_frame, width=300, height=30)
+                layer_frame_pool.grid(row=num_layers * (step_max + 1), column=0, padx=5, pady=5)
+
+                label_pool = Label(layer_frame_pool, text=f"Слой макспулинга {last_pool_layer}:", bg="white")
+                label_pool.grid(row=0, column=0, sticky="w")
+
+                label_filter_matrix = Label(layer_frame_pool, text="Матрица фильтра:", bg="white")
+                label_filter_matrix.grid(row=0, column=1)
+
+                entry_filter_matrix1 = Entry(layer_frame_pool, width=4)
+                entry_filter_matrix1.grid(row=0, column=2)
+                entry_filter_matrix1.insert(0, str(pool_size_default[i][0]))  # Установка значения по умолчанию
+
+                x_label = Label(layer_frame_pool, text="X", bg="white")
+                x_label.grid(row=0, column=3)
+
+                entry_filter_matrix2 = Entry(layer_frame_pool, width=4)
+                entry_filter_matrix2.grid(row=0, column=4)
+                entry_filter_matrix2.insert(0, str(pool_size_default[i][1]))  # Установка значения по умолчанию
+
+                # Сохранение ссылок на поля ввода
+                entry_filter_matrix1_list.append(entry_filter_matrix1)
+                entry_filter_matrix2_list.append(entry_filter_matrix2)
+        if architecture_select == "Создать свою архитектуру":
+            default_fc_neurons = 512
+            last_layer_neurons = 1
+        elif architecture_select == "VGG-16":
+            default_fc_neurons = 4096
+            last_layer_neurons = 1000
+        elif architecture_select == "ResNet-18":
+            default_fc_neurons = 1000
+            last_layer_neurons = 1000
+        elif architecture_select == "AlexNet":
+            default_fc_neurons = 4096
+            last_layer_neurons = 1000
+        elif architecture_select == "LeNet-5":
+            default_fc_neurons = 120
+            last_layer_neurons = 10
+        else:
+            default_fc_neurons = 512
+
+        # Создание строк для полносвязных слоев
+        for i in range(num_fc_layers):
+            layer_frame_fc = Frame(canvas_frame, width=300, height=30)
+            layer_frame_fc.grid(row=(num_layers + i + 1) * (step_max + 1), column=0, padx=5, pady=5)
+
+            label_fc_text = f"Полносвязный слой {i + 1}: Количество нейронов на выходе" if i == num_fc_layers - 1 else f"Полносвязный слой {i + 1}: Количество нейронов:"
+            label_fc = Label(layer_frame_fc, text=label_fc_text, bg="white")
+            label_fc.grid(row=0, column=0, sticky="w")
+
+            num_neurons_entry = Entry(layer_frame_fc, width=4)
+            if i == num_fc_layers - 1:
+                num_neurons_entry.insert(0, last_layer_neurons)
+                activation_value = "sigmoid"
+            else:
+                num_neurons_entry.insert(0, default_fc_neurons)  # Значение по умолчанию
+                activation_value = "relu"
+            num_neurons_entry.grid(row=0, column=1)
+
+            activation_label_fc = Label(layer_frame_fc, text="Функция активации:", bg="white")
+            activation_label_fc.grid(row=0, column=2)
+
+            activation_combobox_fc = ttk.Combobox(layer_frame_fc, values=["relu", "sigmoid", "softmax"], width=7,
+                                                  state="readonly")
+            activation_combobox_fc.grid(row=0, column=3)
+            activation_combobox_fc.current(1)
+            activation_combobox_fc.current(activation_combobox_fc['values'].index(activation_value))
+            num_neurons_entries.append(num_neurons_entry)
+            activation_combobox_fc_list.append(activation_combobox_fc)
+
+        return num_kernels_entries, kernel_size_entries1, kernel_size_entries2, entry_filter_matrix1_list, entry_filter_matrix2_list, num_neurons_entries, activation_combobox_fc_list, activation_combobox_conv_list
+
+
+apply_button = Button(root, text="Применить ", command=two_in_one)
+apply_button.place(x=945, y=520)
+start_button = Button(root, text="Начать обучение", command=check_start_train)
+start_button.place(x=916, y=550)
+stop_button = Button(root, text="Остановить обучение", fg="red", command=stop_training)
+stop_button.place(x=891, y=580)
+
+
+def all_entries_filled():
+    entries = (
+        num_kernels_entries
+        + kernel_size_entries1
+        + kernel_size_entries2
+        + entry_filter_matrix1_list
+        + entry_filter_matrix2_list
+        + num_neurons_entries
+    )
+    for entry in entries:
+        if entry.get() == "" or entry.get() == "0":
+            return False
+    return True
+
+def toggle_settings(button=None):
+    if mode.get() == "basic":
+        mode.set("advanced")
+        basic_button.config(relief=tk.RAISED)
+        advanced_button.config(relief=tk.SUNKEN)
+        blocks_inner_frame.place(x=18, y=190)
+        blocks_frame_dopSettings.place_forget()
+        create_convolution_layers()
+    else:
+        mode.set("basic")
+        basic_button.config(relief=tk.SUNKEN)
+        advanced_button.config(relief=tk.RAISED)
+        blocks_inner_frame.place_forget()
+        blocks_frame_dopSettings.place(x=18, y=190)
+        create_convolution_layers()
+
+
+def checkbox_changed():
+    global checkbox_state
+    if checkbox_state.get():
+        entry6.config(state='normal')  # Разрешаем ввод при выбранной галочке
+    else:
+        entry6.config(state='disabled')  # Запрещаем ввод при отсутствии галочки
+
+
+
+is_save = False
+save_noisy_image = False
+is_your_model = False
+size_img_load_value = IntVar()
+size_img_load_value1 = IntVar()
+size_img_load_value2 = IntVar()
+porog_value = DoubleVar()
+porog_value.set(0.5)
+class_value = IntVar()
+class_value.set(1)
+
+# Привязка функции update_values к изменениям переменных
+size_img_load_value.trace("w", update_values_load)
+size_img_load_value1.trace("w", update_values_load)
+size_img_load_value2.trace("w", update_values_load)
+
+
+blocks_frame_load = Frame(root, width=315, height=500, bg="white")
+blocks_frame_load.place(x=1050, y=10)
+
+label_name = Label(blocks_frame_load, text="Загрузка и тестирование моделей", justify='left', bg="white")
+label_name.place(x=68, y=5)
+
+label_step1_load = Label(blocks_frame_load, text="1.", justify='left', bg="white")
+label_step1_load.place(x=1, y=30)
+
+selected_option_load = StringVar(value="classification_load")
+opt_btn_load = ttk.Radiobutton(blocks_frame_load, text="Загрузить модель с классификацией", variable=selected_option_load, value="classification_load", style="Custom.TRadiobutton")
+opt_btn_load.place(x=15, y=30)
+opt_btn_load2 = ttk.Radiobutton(blocks_frame_load, text="Загрузить модель с распознаванием в сцене", variable=selected_option_load, value="recognition_load", style="Custom.TRadiobutton")
+opt_btn_load2.place(x=15, y=55)
+
+label_step3_load = Label(blocks_frame_load, text="2.", justify='left', bg="white")
+label_step3_load.place(x=1, y=103)
+
+button_load_model = Button(blocks_frame_load, text="Загрузить обученную модель", width=30, command=open_img_size_load)
+button_load_model.place(x=15, y=100)
+
+label_step2_load = Label(blocks_frame_load, text="3.", justify='left', bg="white")
+label_step2_load.place(x=1, y=166)
+
+label_porog = Label(blocks_frame_load, text="Порог принятия решения\nдля 2х классов:", bg="white", justify='left')
+label_porog.place(x=15, y=165)
+entry_porog = Entry(blocks_frame_load, textvariable=porog_value, width=7)
+entry_porog.place(x=170, y=165)
+
+label_step4_load = Label(blocks_frame_load, text="4.", justify='left', bg="white")
+label_step4_load.place(x=1, y=225)
+
+button_load_img = Button(blocks_frame_load, text="Загрузить обычное изображение", width=30, command=load_img)
+button_load_img.place(x=15, y=225)
+
+button_load_img_noisy = Button(blocks_frame_load, text="Загрузить и востановить\nзашумленное изображение", width=30, command=load_img_noisy)
+button_load_img_noisy.configure(justify='center')
+button_load_img_noisy.place(x=15, y=255)
+
+button_load_img_noisy_help = Button(blocks_frame_load, text="?", width=2)
+button_load_img_noisy_help.place(x=240, y=260)
+
+button_save_img_noisy = Button(blocks_frame_load, text="Куда сохранить\nвостановленное изображение", width=30, command=load_img_noisy_save)
+button_save_img_noisy.configure(justify='center')
+button_save_img_noisy.place(x=15, y=300)
+
+
+
+blocks_frame = Frame(root, width=315, height=600, bg="white")
+blocks_frame.place(x=110, y=10)
+
+blocks_inner_frame = Frame(blocks_frame, width=292, height=325, bg="white")
+blocks_inner_frame.place(x=18, y=190)
+
+blocks_frame_dopSettings = Frame(blocks_frame, width=292, height=260, bg="white")
+blocks_frame_dopSettings.place(x=18, y=190)
+
+
+
+canvas = Canvas(root, width=580, height=500, bg="white")
+canvas.place(x=440, y=9)
+scrollbar = Scrollbar(root, command=canvas.yview)
+scrollbar.place(x=1025, y=10, height=500)
+canvas.config(yscrollcommand=scrollbar.set)
+canvas_frame = Frame(canvas, bg="white")
+canvas.create_window((0, 0), window=canvas_frame, anchor="n")
+canvas_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+
+
+
+
+style = ttk.Style()
+style.configure("Custom.TRadiobutton", background="white")
+
+label_name_cnn = Label(blocks_frame, text="Создание нейронной сети:", bg="white")
+label_name_cnn.place(x=90, y=6)
+
+label_step1_cnn = Label(blocks_frame, text="1.", bg="white")
+label_step1_cnn.place(x=1, y=55)
+
+label_step2_cnn = Label(blocks_frame, text="2.", bg="white")
+label_step2_cnn.place(x=2, y=106)
+
+combo1 = ttk.Combobox(blocks_frame, values=["Создать свою архитектуру", "VGG-16", "ResNet-18", "AlexNet", "LeNet-5"], width=35, state="readonly")
+combo1.place(x=20, y=106)
+combo_optemizator = StringVar()
+combo_var = StringVar()
+checkbox_state = BooleanVar(value=True)
+mode = tk.StringVar()
+mode.set("advanced")
+selected_value = StringVar()
+sizeimg1_value = IntVar()
+sizeimg2_value = IntVar()
+canal_value = IntVar()
+covd_value = IntVar()
+hidden_layer = IntVar()
+stepMax_value = IntVar()
+fully_conect = IntVar()
+classlosse = 'binary_crossentropy'
+loss_value = DoubleVar()
+dropout = DoubleVar()
+batch_size_value = IntVar()
+optimizer_value_str = StringVar()
+optimizer = 'adam'
+epoch_value = IntVar()
+
+
+labell1 = Label(blocks_frame_dopSettings, text="Количество скрытых слоев:", bg="white")
+labell1.place(x=1, y=1)
+entryy1 = Entry(blocks_frame_dopSettings, textvariable=hidden_layer)
+entryy1.place(x=160, y=1)
+
+labell2 = Label(blocks_frame_dopSettings, text="Количество полносвязных\nслоев:", justify='left', bg="white")
+labell2.place(x=1, y=23)
+entryy2 = Entry(blocks_frame_dopSettings, textvariable=fully_conect)
+entryy2.place(x=160, y=31)
+
+label7 = Label(blocks_frame_dopSettings, text="Класс (ClassMod):", bg="white")
+label7.place(x=1, y=61)
+combo1_3 = ttk.Combobox(blocks_frame_dopSettings, textvariable=combo_var, values=['binary', 'categorical'], width=8, state="readonly")
+combo1_3.place(x=160, y=61)
+combo1_3.bind("<<ComboboxSelected>>", class_mode_select)
+combo1_3.current(0)
+
+label9 = Label(blocks_frame_dopSettings, text="Максимальное число эпох:", bg="white")
+label9.place(x=1, y=91)
+entry9 = Entry(blocks_frame_dopSettings, textvariable=epoch_value)
+entry9.place(x=160, y=91)
+
+label11 = Label(blocks_frame_dopSettings, text="Значение loss для\nзавершения обучения:", justify='left', bg="white")
+label11.place(x=1, y=113)
+entry11 = Entry(blocks_frame_dopSettings, textvariable=loss_value)
+entry11.place(x=160, y=121)
+
+label14 = Label(blocks_frame_dopSettings, text="Алгоритм обучения:", bg="white")
+label14.place(x=1, y=151)
+combo2 = ttk.Combobox(blocks_frame_dopSettings, textvariable = combo_optemizator, values=["Адаптивная оценка", "Оптимизационный алгоритм", "Стохастический градиентный спуск"], width=25, state="readonly")
+combo2.place(x=125, y=151)
+combo2.bind("<<ComboboxSelected>>", on_optimize_selected)
+combo2.current(0)
+
+
+
+basic_button = tk.Button(blocks_frame, text="Базовые настройки", relief=tk.SUNKEN, command=lambda: toggle_settings("basic"), width=21, height= 1, font=("Arial", 8))
+basic_button.place(x=20, y=55)
+
+advanced_button = tk.Button(blocks_frame, text="Продвинутые настройки", relief=tk.RAISED, command=lambda: toggle_settings("advanced"), width=21, height= 1, font=("Arial", 8))
+advanced_button.place(x=150, y=55)
+
+combo1.bind("<<ComboboxSelected>>", update_values)
+combo1.current(0)
+
+
+label1 = Label(blocks_frame, text="Размер изображения:", bg="white")
+label1.place(x=20, y=135)
+
+entry1 = tk.Entry(blocks_frame, width=4, textvariable=sizeimg1_value)
+label1_1 = tk.Label(blocks_frame, text="Х", bg="white")
+entry1_2 = tk.Entry(blocks_frame, width=4, textvariable=sizeimg2_value)
+label1_3 = tk.Label(blocks_frame, text="каналов", bg="white")
+entry1_3 = tk.Entry(blocks_frame, width=1, textvariable=canal_value, bg="white")
+entry1.place(x=170, y=135)
+label1_1.place(x=200, y=133)
+entry1_2.place(x=214, y=135)
+label1_3.place(x=238, y=133)
+entry1_3.place(x=288, y=135)
+
+label3 = Label(blocks_inner_frame, text="Количество слоев свертки:", bg="white")
+label3.place(x=1, y=1)
+entry3 = Entry(blocks_inner_frame, textvariable=covd_value)
+entry3.place(x=160, y=1)
+
+label4 = Label(blocks_inner_frame, text="Шаг слоя макспуллинг:", bg="white")
+label4.place(x=1, y=31)
+entry4 = Entry(blocks_inner_frame, textvariable=stepMax_value)
+entry4.place(x=160, y=31)
+
+label5 = Label(blocks_inner_frame, text="Количество полносвязных\nслоев:", justify='left', bg="white")
+label5.place(x=1, y=53)
+entry5 = Entry(blocks_inner_frame, textvariable=fully_conect)
+entry5.place(x=160, y=61)
+
+label6 = Label(blocks_inner_frame, text="DropOut:", bg="white")
+label6.place(x=1, y=91)
+entry6 = Entry(blocks_inner_frame, textvariable=dropout, width=7)
+entry6.place(x=160, y=91)
+checkbox = Checkbutton(blocks_inner_frame, variable=checkbox_state, command=checkbox_changed, bg="white")
+checkbox.place(x=220, y=89)
+
+label7 = Label(blocks_inner_frame, text="Класс (ClassMod):", bg="white")
+label7.place(x=1, y=121)
+combo3 = ttk.Combobox(blocks_inner_frame, textvariable=combo_var, values=['binary', 'categorical'], width=8, state="readonly")
+combo3.place(x=160, y=121)
+combo3.bind("<<ComboboxSelected>>", class_mode_select)
+combo3.current(0)
+
+label8 = Label(blocks_inner_frame, text="Размер пакета (BatchSize):", bg="white")
+label8.place(x=1, y=151)
+entry8 = Entry(blocks_inner_frame, textvariable=batch_size_value)
+entry8.place(x=160, y=151)
+
+label9 = Label(blocks_inner_frame, text="Максимальное число эпох:", bg="white")
+label9.place(x=1, y=181)
+entry9 = Entry(blocks_inner_frame, textvariable=epoch_value)
+entry9.place(x=160, y=181)
+
+label11 = Label(blocks_inner_frame, text="Значение loss для\nзавершения обучения:", justify='left', bg="white")
+label11.place(x=1, y=203)
+entry11 = Entry(blocks_inner_frame, textvariable=loss_value)
+entry11.place(x=160, y=211)
+
+label14 = Label(blocks_inner_frame, text="Алгоритм обучения:", bg="white")
+label14.place(x=1, y=241)
+combo1_2 = ttk.Combobox(blocks_inner_frame, textvariable =combo_optemizator, values=["Адаптивная оценка", "Оптимизационный алгоритм", "Стохастический градиентный спуск"], width=25, state="readonly")
+combo1_2.place(x=125, y=241)
+
+combo1_2.bind("<<ComboboxSelected>>", on_optimize_selected)
+combo1_2.current(0)
+
+label_name3_cnn = Label(blocks_frame, text="3.", bg="white")
+label_name3_cnn.place(x=2, y=525)
+
+dataset_button = tk.Button(blocks_frame, text="Путь к датасету", width=20, command=open_dataset_directory)
+dataset_button.place(x=20, y=525)
+
+place_save_model_button = tk.Button(blocks_frame, text="Куда сохранять обученную\nмодель", width=25, command=save_model)
+place_save_model_button.configure(justify='center')
+place_save_model_button.place(x=20, y=555)
+
+# Создание текстового виджета без привязки прокрутки
+text = scrolledtext.ScrolledText(root, width=150, height=15)
+text.pack(side="bottom")
+
+# Удалите следующую строку, если вы хотите запретить прокрутку текстового виджета колесом мыши
+text.bind_all("<MouseWheel>", lambda e: "break")
+
+# Создание переменной для хранения предыдущей длины текста
+prev_length = 0
+
+# Привязываем контекстное меню к текстовому окну для копирования
+text.bind("<Button-3>", lambda e: text.focus())
+
+# Привязываем обработку нажатия клавиш
+text.bind("<Control-c>", copy_text)
+
+update_values()
+toggle_settings()
+# Перенаправляем вывод консоли и обновляем текстовое окно
+update_console_output()
+# Создаем переменные для хранения путей
+class_mode = 'binary'
+train_path = tk.StringVar()
+test_path = tk.StringVar()
+val_path = tk.StringVar()
+is_apply = False
+valid_model = True
+model = None
+training_in_progress = False
+create_convolution_layers()
+# Очистка предыдущих строк при изменении значения covd_value или stepMax_value
+covd_value.trace("w", lambda *args: create_convolution_layers())
+stepMax_value.trace("w", lambda *args: create_convolution_layers())
+fully_conect.trace("w", lambda *args: create_convolution_layers())
+hidden_layer.trace("w", lambda *args: create_convolution_layers())
+sizeimg1_value.trace("w", lambda *args: create_convolution_layers())
+sizeimg2_value.trace("w", lambda *args: create_convolution_layers())
+canal_value.trace("w", lambda *args: create_convolution_layers())
+
+
+root.mainloop()
