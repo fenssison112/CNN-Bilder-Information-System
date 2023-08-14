@@ -111,7 +111,7 @@ def update_values_load(*args):
     size_img_load_value1.get()
     size_img_load_value2.get()
 
-
+# Функция выбора обученой модели
 def loading_selection_img():
     global img_path_load, model_load, file_path_model_load
 
